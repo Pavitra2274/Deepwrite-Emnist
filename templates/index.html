@@ -1,0 +1,325 @@
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <title>EMNIST Character Recognition</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background: white;
+      }
+      canvas {
+        border: 2px solid black;
+        background: white;
+        cursor: crosshair;
+      }
+      .controls {
+        margin: 10px;
+      }
+      .color-btn {
+        padding: 5px 10px;
+        margin: 0 5px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Draw a Character (0-9, A-Z, a-z)</h1>
+
+    <div class="controls">
+      <label>Pen Color:</label>
+      <button
+        class="color-btn"
+        style="color: black"
+        onclick="setColor('black')"
+      >
+        Black
+      </button>
+      <button class="color-btn" style="color: red" onclick="setColor('red')">
+        Red
+      </button>
+      <button class="color-btn" style="color: blue" onclick="setColor('blue')">
+        Blue
+      </button>
+      <button onclick="clearCanvas()">Clear</button>
+      <button onclick="sendImage()">Predict</button>
+    </div>
+
+    <canvas id="canvas" width="280" height="280"></canvas>
+
+    <h2 id="predText">Prediction:</h2>
+    <div id="topk"></div>
+    <canvas id="chart" width="400" height="200"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      let canvas = document.getElementById("canvas");
+      let ctx = canvas.getContext("2d");
+      ctx.lineWidth = 15;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "black";
+      let drawing = false;
+
+      function setColor(color) {
+        ctx.strokeStyle = color;
+      }
+
+      function clearCanvas() {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      clearCanvas();
+
+      canvas.addEventListener("mousedown", () => (drawing = true));
+      canvas.addEventListener("mouseup", () => (drawing = false));
+      canvas.addEventListener("mousemove", draw);
+
+      function draw(e) {
+        if (!drawing) return;
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+      }
+
+      function sendImage() {
+        let dataURL = canvas.toDataURL();
+        fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataURL }),
+        })
+          .then((res) => res.json())
+          .then((data) => showResults(data));
+      }
+
+      function showResults(data) {
+        document.getElementById(
+          "predText"
+        ).innerText = `Predicted: ${data.prediction_char} (index ${data.prediction_index})`;
+
+        let topkDiv = document.getElementById("topk");
+        topkDiv.innerHTML = "";
+        data.topk.forEach((it, i) => {
+          let row = document.createElement("div");
+          row.innerHTML = `<strong>${i + 1}.</strong> ${it.char} (idx ${
+            it.idx
+          }) — ${(it.prob * 100).toFixed(2)}%`;
+          topkDiv.appendChild(row);
+        });
+
+        const ctxChart = document.getElementById("chart").getContext("2d");
+        new Chart(ctxChart, {
+          type: "bar",
+          data: {
+            labels: data.topk.map((item) => item.char),
+            datasets: [
+              {
+                label: "Probability (%)",
+                data: data.topk.map((item) => (item.prob * 100).toFixed(2)),
+                backgroundColor: "rgba(0, 123, 255, 0.6)",
+              },
+            ],
+          },
+          options: { scales: { y: { beginAtZero: true } } },
+        });
+      }
+    </script>
+  </body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>EMNIST Character Recognition</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background: #f9f9f9;
+        text-align: center;
+        margin: 40px;
+      }
+
+      h1 {
+        color: #333;
+      }
+
+      #canvas {
+        border: 2px solid #ddd;
+        background-color: #000;
+        cursor: crosshair;
+      }
+
+      #buttons {
+        margin: 15px;
+      }
+
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        border: none;
+        background-color: #007bff;
+        color: white;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      #resultBox {
+        margin-top: 25px;
+        padding: 10px;
+        background-color: #d4edda;
+        color: #155724;
+        font-weight: bold;
+        border-radius: 5px;
+        display: inline-block;
+      }
+
+      #probabilityChart {
+        max-width: 500px;
+        margin: 30px auto;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>EMNIST Character Recognition</h1>
+    <div class="subtitle">
+      Draw a character (0-9, A-Z, a-z) in white on black
+    </div>
+
+    <canvas id="canvas" width="280" height="280"></canvas>
+
+    <div id="buttons">
+      <button onclick="clearCanvas()">Clear</button>
+      <button onclick="predict()">Predict</button>
+    </div>
+
+    <div id="resultBox">Prediction: -- | Confidence: --%</div>
+
+    <canvas id="probabilityChart" width="400" height="200"></canvas>
+
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      let drawing = false;
+
+      // Initialize with black background
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 15;
+      ctx.lineCap = "round";
+
+      canvas.addEventListener("mousedown", startDrawing);
+      canvas.addEventListener("mouseup", stopDrawing);
+      canvas.addEventListener("mouseleave", stopDrawing);
+      canvas.addEventListener("mousemove", draw);
+
+      function startDrawing(e) {
+        drawing = true;
+        draw(e);
+      }
+
+      function stopDrawing() {
+        drawing = false;
+        ctx.beginPath();
+      }
+
+      function draw(e) {
+        if (!drawing) return;
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+      }
+
+      function clearCanvas() {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        document.getElementById("resultBox").innerText =
+          "Prediction: -- | Confidence: --%";
+        if (window.probChart) window.probChart.destroy();
+      }
+
+      function predict() {
+        const imageData = canvas.toDataURL("image/png");
+        fetch("/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            const maxProb = Math.max(...data.probabilities);
+            const confidence = (maxProb * 100).toFixed(1);
+
+            document.getElementById(
+              "resultBox"
+            ).innerText = `Predicted: ${data.prediction_char} | Confidence: ${confidence}%`;
+
+            const ctxBar = document
+              .getElementById("probabilityChart")
+              .getContext("2d");
+
+            if (window.probChart) window.probChart.destroy();
+
+            // Create a sorted list of top predictions
+            const allProbs = data.probabilities
+              .map((prob, idx) => ({
+                char:
+                  idx < 10
+                    ? String(idx)
+                    : idx < 36
+                    ? String.fromCharCode(55 + idx)
+                    : String.fromCharCode(61 + idx),
+                prob: prob,
+              }))
+              .sort((a, b) => b.prob - a.prob)
+              .slice(0, 10);
+
+            window.probChart = new Chart(ctxBar, {
+              type: "bar",
+              data: {
+                labels: allProbs.map((item) => item.char),
+                datasets: [
+                  {
+                    label: "Probability",
+                    data: allProbs.map((item) => item.prob),
+                    backgroundColor: "rgba(75, 192, 192, 0.6)",
+                    borderColor: "rgba(75, 192, 192, 1)",
+                    borderWidth: 1,
+                  },
+                ],
+              },
+              options: {
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    max: 1,
+                  },
+                },
+              },
+            });
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            document.getElementById("resultBox").innerText =
+              "Error making prediction";
+          });
+      }
+    </script>
+  </body>
+</html>
