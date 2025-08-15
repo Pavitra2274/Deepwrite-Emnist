@@ -6,7 +6,7 @@ Developed a Convolutional Neural Network (CNN) model trained on the EMNIST ByCla
 
 ## Dataset
 
-<b>Name:/<b> EMNIST ByClass<br>
+<b>Name:</b> EMNIST ByClass<br>
 <b>Size:</b> 814,255 grayscale images (697,932 training + 116,323 testing)<br>
 <b>Image Size:</b> 28×28 pixels<br>
 <b>Classes:</b> 62 (digits 0–9, uppercase A–Z, lowercase a–z)<br>
